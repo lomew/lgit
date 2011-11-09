@@ -70,6 +70,9 @@ the \\[lgit-explain-this-line] command.")
 (defvar lgit-resolve-confirm t
   "*If non-nil, resolving files will require confirmation.")
 
+(defvar lgit-commit-mode-hook nil
+  "*Hook to run upon entry to `lgit-commit-mode'.")
+
 ;; XXX/lomew revisit all this font-lock crap for tty and dark
 ;; backgrounds.  Took some ideas from pgit.
 
@@ -806,6 +809,7 @@ This mode is not meant to be user invoked."
   (set-buffer-modified-p nil)
 
   (message (substitute-command-keys "Type \\[lgit-commit-finish] when done."))
+  (run-hooks 'lgit-commit-mode-hook)
   (run-hooks 'text-mode-hook))
 
 ;; Insert stuff to show them what files they're affecting.
