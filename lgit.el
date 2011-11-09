@@ -265,6 +265,10 @@ the same directory."
 						 lgit-last-dir
 						 lgit-last-dir t)))
 		     current-prefix-arg))
+  ;; Have to run it from the top of the repository.  Otherwise the paths
+  ;; that come out of --porcelain are incorrect
+  (if (not (file-directory-p (concat dir ".git")))
+      (error "%s does not contain a git repository" dir))
   (setq lgit-last-dir dir)
   (let* ((basename (file-name-nondirectory (directory-file-name dir)))
 	 (bufname (format "*GIT-status-%s*" basename))
@@ -307,9 +311,7 @@ the same directory."
 	      (buffer-disable-undo (current-buffer))
 	      (erase-buffer)
 	      (insert "In " dir "\n")
-	      ;; XXX/lomew show git branch output
-;-	      (insert "BASE is " (lgit-info-get info "Revision") "\n")
-;-	      (insert "URL is " (lgit-info-get info "URL") "\n")
+	      (insert "On branch " (lgit-current-branch) "\n")
 	      (insert "\n")
 	      (insert "$ " (mapconcat 'identity cmd " ") "\n")
 	      (insert lgit-lots-of-dashes "\n")
@@ -815,6 +817,7 @@ This mode is not meant to be user invoked."
   (insert "#\n")
   (let ((bufname "*GIT-commit*")
 	status)
+    ;; XXX/lomew note this assumes commit.status=true
     (setq status (lgit-do-command-quietly "commit" (list "--dry-run")))
     (if (zerop status)
 	(insert-buffer-substring bufname)
@@ -1387,6 +1390,21 @@ the value of `foo'."
 		 ((< lgit-git-minor-version min) -1)
 		 ;; minors are equal too
 		 (t 0)))))
+
+(defun lgit-current-branch ()
+  ;; Figure out which branch we are on.
+  (let ((status (lgit-do-command-quietly "branch"))
+	(bufname "*GIT-branch*"))
+    (if (zerop status)
+	(unwind-protect
+	    (save-excursion
+	      (set-buffer bufname)
+	      (goto-char (point-min))
+	      (if (re-search-forward "^\\* \\(.*\\)" nil t)
+		  (match-string 1)
+		(error "cannot find active branch in \"git branch\" output")))
+	  (kill-buffer bufname))
+      (error "cannot determine current branch"))))
 
 
 ;; Process-related stuff.
