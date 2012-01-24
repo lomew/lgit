@@ -593,7 +593,8 @@ formally committed."
       (setq cur (cdr cur))
       (cond
        ((or (memq 'i-modified state)
-	    (memq 'w-modified state))
+	    (memq 'w-modified state)
+	    (memq 'untracked state))
 	nil)
 ;       ((memq 'deleted state)
 ;	;; XXX/lomew it would be nice to collect these and then do a git revert
@@ -607,13 +608,16 @@ formally committed."
     (message "Adding...done")
     (if (zerop status)
 	;; " M" -> "M "
+	;; "??" -> "A "
 	;; Update the diplayed state of the files to "M " from " M"
 	(let ((cur files)
 	      pair)
 	  (while cur
 	    (setq pair (car cur))
 	    (setq cur (cdr cur))
-	    (lgit-change-file-index-state (car pair) 'i-modified)
+	    (if (memq 'untracked (cdr pair))
+		(lgit-change-file-index-state (car pair) 'i-added)
+	      (lgit-change-file-index-state (car pair) 'i-modified))
 	    (lgit-change-file-working-state (car pair) 'w-unmodified)))
       ;; Otherwise an error happened, bitch appropriately
       (pop-to-buffer "*GIT-add*")
@@ -1397,18 +1401,23 @@ the value of `foo'."
 
 (defun lgit-current-branch ()
   ;; Figure out which branch we are on.
-  (let ((status (lgit-do-command-quietly "branch"))
-	(bufname "*GIT-branch*"))
-    (if (zerop status)
-	(unwind-protect
-	    (save-excursion
-	      (set-buffer bufname)
-	      (goto-char (point-min))
-	      (if (re-search-forward "^\\* \\(.*\\)" nil t)
-		  (match-string 1)
-		(error "cannot find active branch in \"git branch\" output")))
-	  (kill-buffer bufname))
-      (error "cannot determine current branch"))))
+  (let ((status (lgit-do-command-quietly "symbolic-ref" '("-q" "HEAD")))
+	(bufname "*GIT-symbolic-ref*"))
+    (unwind-protect
+	(cond ((zerop status)
+	       (save-excursion
+		 (set-buffer bufname)
+		 (goto-char (point-min))
+		 ;; Something like refs/heads/master.  Note the branch
+		 ;; name may contain slashes.
+		 (if (re-search-forward "refs/heads/\\(.*\\)" nil t)
+		     (match-string 1)
+		   (error "cannot find active branch in \"git symbolic-ref\" output"))))
+	      ((= status 1)
+	       "(detached head)")
+	      (t
+	       (error "cannot determine current branch")))
+      (kill-buffer bufname))))
 
 
 ;; Process-related stuff.
