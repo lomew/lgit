@@ -30,6 +30,12 @@
 ;; - can use git apply --cached --recount to apply individual hunks
 ;; - can leverage emacs' diff-mode hunk splitting, which seems more
 ;;   powerful than the 's' command in interactive add
+;; - example rename output after git mv:
+;;    R  global/cfg_spec.xml -> config/cfg_spec.xml
+;;    R  global/dynamic_spec.xml -> config/dynamic_spec.xml
+;;    R  global/securevault_spec.xml -> config/securevault_spec.xml
+;;    R  global/protobuf_header.h -> valib/protobuf_header.h
+
 
 ;; blah blah blah
 ;; (setq lgit-commit-template "BugID: \nCC: \nApproved-by: \nReviewed-by: \n")
@@ -554,6 +560,7 @@ This is useful to get files with similar status together."
   ;; XXX/lomew maybe later let prefix arg mean commit only the file
   ;; under cursor, see git-commit(1) where it talks about listing
   ;; files to commit
+  ;; XXX/lomew confusing error if index is empty
   (interactive)
   (lgit-bitch-if-commit-in-progress)
   (let ((this-buffer (current-buffer)))
