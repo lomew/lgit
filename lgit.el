@@ -64,8 +64,8 @@ the \\[lgit-explain-this-line] command.")
       "/tmp")
   "*Name of a directory where lgit can put temporary files.")
 
-(defvar lgit-revert-confirm t
-  "*If non-nil, reverting files will require confirmation.")
+(defvar lgit-discard-confirm t
+  "*If non-nil, discarding unstaged changes will require confirmation.")
 
 (defvar lgit-resolve-confirm t
   "*If non-nil, resolving files will require confirmation.")
@@ -193,7 +193,7 @@ the \\[lgit-explain-this-line] command.")
     (define-key map "m" 'lgit-mark-file)
     (define-key map "u" 'lgit-unmark-file)
 ;    (define-key map "U" 'lgit-update-some-files)
-;    (define-key map "R" 'lgit-revert)
+    (define-key map "R" 'lgit-discard)
 ;    (define-key map "V" 'lgit-resolve)
     (define-key map "C" 'lgit-commit)
     (define-key map "d" 'lgit-diff-base)
@@ -611,14 +611,15 @@ formally committed."
 	;; "??" -> "A "
 	;; Update the diplayed state of the files to "M " from " M"
 	(let ((cur files)
-	      pair)
+	      file state)
 	  (while cur
-	    (setq pair (car cur))
+	    (setq file (car (car cur))
+		  state (cdr (car cur)))
 	    (setq cur (cdr cur))
-	    (if (memq 'untracked (cdr pair))
-		(lgit-change-file-index-state (car pair) 'i-added)
-	      (lgit-change-file-index-state (car pair) 'i-modified))
-	    (lgit-change-file-working-state (car pair) 'w-unmodified)))
+	    (if (memq 'untracked state)
+		(lgit-change-file-index-state file 'i-added)
+	      (lgit-change-file-index-state file 'i-modified))
+	    (lgit-change-file-working-state file 'w-unmodified)))
       ;; Otherwise an error happened, bitch appropriately
       (pop-to-buffer "*GIT-add*")
       (goto-char (point-min))
@@ -676,45 +677,94 @@ otherwise just this file."
 	    "*** XXX/lomew deal with this buffer\n"
 	    "\n")))
 
-(defun lgit-revert (arg)
-  ;; XXX/lomew to revert from work tree: git checkout -- files..
-  ;;           to revert from index/unstage: git reset HEAD files
-  "Revert some files, discarding local changes.
-By default reverts the file on this line.
-If supplied with a prefix argument, revert the marked files.
-By default this command requires confirmation to remove the files.  To
-disable the confirmation, you can set `lgit-revert-confirm' to nil."
+(defun lgit-unstage (arg)
+  "Unstage some files, removing them from the index.
+By default unstages the file on this line.
+If supplied with a prefix argument, unstage the marked files.
+Does the equivalent of \"git reset HEAD file1 file2...\"."
+  (interactive "P")
+  (let ((files (lgit-get-relevant-files arg))
+	status cur)
+
+    ;; Check thru for unstageable ones.
+    (setq cur files)
+    (while cur
+      (setq state (cdr (car cur)))
+      (setq cur (cdr cur))
+      (cond
+       ;; XXX/lomew test other states, added, deleted, renamed, etc
+       ((or (memq 'i-modified state))
+	nil)
+       (t
+	(error "Can only unstage modified files"))))
+    
+    (message "Unstaging...")
+    (setq status (lgit-do-command-quietly "reset" (append '("-q" "HEAD")
+							  (mapcar 'car files))))
+    (message "Unstaging...done")
+
+    (if (zerop status)
+	;; Update the diplayed state of the files.
+	;; "M." -> " M"
+	(let ((cur files)
+	      file)
+	  (while cur
+	    (setq file (cdr (car cur)))
+	    (setq cur (cdr cur))
+	    (lgit-change-file-index-state file 'i-unmodified)
+	    (lgit-change-file-working-state file 'w-modified)))
+      ;; Otherwise an error happened, bitch appropriately
+      (pop-to-buffer "*GIT-reset*")
+      (goto-char (point-min))
+      (insert "\n"
+	      "*** The unstage was not completely successful.\n"
+	      "*** Check this buffer closely to determine what is wrong.\n"
+	      "\n")
+      (error "Add failed, see *GIT-reset* buffer for details."))))
+
+(defun lgit-discard (arg)
+  "Discard unstaged changes from some files.
+By default affects the file on this line.
+If supplied with a prefix argument, affect the marked files.
+By default this command requires confirmation.  To
+disable the confirmation, you can set `lgit-discard-confirm' to nil.
+Does the equivalent of \"git checkout -- file1 file2...\"."
   (interactive "P")
   (let* ((files (lgit-get-relevant-files arg))
 	 (multiple-p (cdr files))
 	 status)
     (if (and lgit-revert-confirm
-	     (not (yes-or-no-p (format "Revert %s? "
+	     (not (yes-or-no-p (format "Discard unstaged changes to %s? "
 				       (if multiple-p
 					   "the marked files"
 					 (car (car files)))))))
-	(message "Revert cancelled")
-      (message "Reverting...")
-      (setq status (lgit-do-command-quietly "revert" (mapcar 'car files)))
-      (message "Reverting...done")
+	(message "Discard cancelled")
+      (message "Discarding...")
+      (setq status (lgit-do-command-quietly "checkout" (cons "--" (mapcar 'car files))))
+      (message "Discarding...done")
       (if (zerop status)
-	  ;; Revert some buffers and remove the file lines from the status buf
+	  ;; Revert some buffers and update the displayed status.
+	  ;; "xM" -> "x "
 	  (let ((cur files)
-		pair file)
+		file state)
 	    (while cur
-	      (setq pair (car cur))
+	      (setq file (car (car cur))
+		    state (cdr (car cur)))
 	      (setq cur (cdr cur))
-	      (setq file (car pair))
-	      (lgit-revert-buffers-visiting-file file)
-	      (lgit-remove-file-line file)))
+	      (if (memq 'i-unmodified state)
+		  ;; No index changes, remove the line.
+		  (lgit-remove-file-line file)
+		;; Otherwise just update the state
+		(lgit-change-file-working-state file 'w-unmodified))
+	      (lgit-revert-buffers-visiting-file file)))
       ;; Otherwise an error happened, bitch appropriately
-      (pop-to-buffer "*GIT-revert*")
+      (pop-to-buffer "*GIT-checkout*")
       (goto-char (point-min))
       (insert "\n"
-	      "*** The revert was not completely successful.\n"
+	      "*** The discard/checkout was not completely successful.\n"
 	      "*** Check this buffer closely to determine what is wrong.\n"
 	      "\n")
-      (error "Revert failed, see *GIT-revert* buffer for details.")))))
+      (error "Revert failed, see *GIT-checkout* buffer for details.")))))
 
 (defun lgit-resolve (arg)
   "Mark some conflicted files as resolved.
