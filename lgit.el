@@ -136,19 +136,18 @@ the \\[lgit-explain-this-line] command.")
 
 (defvar lgit-common-font-lock-keywords
   '(
-    ("^[MDA].*"		. lgit-modified-face)
+    ("^[MDAR].*"	. lgit-modified-face)
     ("^.[M].*"		. lgit-modified-face)
     ("^C.*"		. lgit-conflicted-face)
     ("^.C.*"		. lgit-conflicted-face)
-    ("^......[C]"	. lgit-conflicted-face)
     ))
 (defvar lgit-status-font-lock-keywords
   (append
    '(
-     ("^.......?\\*.*"	. lgit-marked-face)
+     ("^..\\*.*"	. lgit-marked-face)
      )
    lgit-common-font-lock-keywords))
-(defvar lgit-ustatus-font-lock-keywords
+(defvar lgit-ustatus-font-lock-keywords	;XXX/lomew unuesd
   (append
    '(
      ("^....................?\\*.*" . lgit-marked-face)
@@ -623,10 +622,12 @@ formally committed."
 	    (setq file (car (car cur))
 		  state (cdr (car cur)))
 	    (setq cur (cdr cur))
-	    (if (memq 'untracked state)
-		(lgit-change-file-index-state file 'i-added)
-	      (lgit-change-file-index-state file 'i-modified))
-	    (lgit-change-file-working-state file 'w-unmodified)))
+	    (cond
+	     ((memq 'untracked state)		; ?? -> A_
+	      (lgit-change-file-index-state file 'i-added))
+	     ((memq 'i-unmodified state)	; _x -> Mx
+	      (lgit-change-file-index-state file 'i-modified)))
+	    (lgit-change-file-working-state file 'w-unmodified))) ; xx -> x_
       ;; Otherwise an error happened, bitch appropriately
       (pop-to-buffer "*GIT-add*")
       (goto-char (point-min))
@@ -915,9 +916,6 @@ This mode is not meant to be user invoked."
 	  (goto-char (point-min))
 	  (insert lgit-commit-initial-buffer-contents)
 	  (error "Please specify a non-empty commit message")))
-    ;; Make sure any buffers visiting those files aren't dirty.
-    ;; XXX/lomew
-    ;- (lgit-ensure-saved justfiles)
     ;; Store the commit message in a temp file to
     ;; avoid any limits on argv size.
     (setq message-file (make-temp-name (concat (file-name-as-directory
@@ -942,20 +940,10 @@ This mode is not meant to be user invoked."
     ;; Complain loudly if the commit failed.
     (if (zerop status)
 	(progn
-	  (pop-to-buffer commit-bufname)
-	  (insert "\n"
-		  "*** XXX/lomew deal with this buffer\n"
-		  "\n")
+	  (pop-to-buffer parent)
+	  (lgit-commit-update-index-display)
 	  ;; Only chuck buffer when all is good.
 	  (kill-buffer logbuf))
-;-	(let ((cur justfiles) file)
-;-	  (while cur
-;-	    (setq file (car cur))
-;-	    (lgit-revert-buffers-visiting-file file)
-;-	    (lgit-remove-file-line file)
-;-	    (setq cur (cdr cur)))
-;-	  ;; Only chuck buffer when all is good.
-;-	  (kill-buffer logbuf))
       ;; Commit failed.
       (pop-to-buffer commit-bufname)
       (goto-char (point-min))
@@ -966,6 +954,24 @@ This mode is not meant to be user invoked."
 	      "\n")
       (error "Commit failed, see %s buffer for details." commit-bufname))))
 
+(defun lgit-commit-update-index-display ()
+  ;; Update the display post-commit for files that were in the index.
+  ;; XXX/lomew svn/cvs ones revert the buffers for the files, prob for $Id$ crap.
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward lgit-linepat nil t)
+      (let ((state (lgit-current-file-state)))
+	(if (or (memq 'i-modified state)
+		(memq 'i-added state)
+		(memq 'i-deleted state)
+		(memq 'i-renamed state)
+		(memq 'i-copied state))
+	    (progn
+	      (lgit-change-this-file-index-state 'i-unmodified)
+	      (if (memq 'w-unmodified state)
+		  ;; Nothing to display for this file, remove the line.
+		  (lgit-remove-file-line (lgit-current-file)))))))))
+	    
 (defun lgit-commit-tidy-up-buffer ()
   (save-excursion
     ;; Remove leading blank lines.
@@ -1013,12 +1019,19 @@ This mode is not meant to be user invoked."
 
 ;; Internal functions.
 
+(defun lgit-filepat (file)
+  (concat lgit-linepat "\\(.+ -> \\)?" (regexp-quote file) "$"))
+
 (defun lgit-current-file ()
   (save-excursion
     (beginning-of-line)
     (if (looking-at lgit-linepat)
-	(buffer-substring (match-end 0)
-			  (progn (end-of-line) (point)))
+	(let ((file-part (buffer-substring (match-end 0)
+					   (progn (end-of-line) (point)))))
+	  ;; handle the output from "git mv" files foo -> bar, take bar.
+	  (if (string-match "\\(.+\\) -> \\(.+\\)" file-part)
+	      (match-string 2 file-part)
+	    file-part))
       (error "No file on this line"))))
 
 (defun lgit-current-file-state ()
@@ -1265,22 +1278,10 @@ the value of `foo'."
     (goto-char (point-min))
     ;; Remove the line.
     (let ((buffer-read-only nil))
-      (delete-matching-lines (concat lgit-linepat (regexp-quote file) "$")))
+      (delete-matching-lines (lgit-filepat file)))
     ;; Update marked files.
     (if (assoc file lgit-marked-files)
 	(setq lgit-marked-files (lgit-remassoc file lgit-marked-files)))))
-
-(defun lgit-remove-conflict-file-lines (file)
-  ;; Delete lines in the (readonly) status buffer that match the conflict
-  ;; files for a file name.  These are the file.mine, file.r123 files.
-  (save-excursion
-    (goto-char (point-min))
-    ;; Remove the matching lines.
-    (let ((buffer-read-only nil))
-      (delete-matching-lines (concat lgit-linepat (regexp-quote file) "\\.mine$"))
-      (delete-matching-lines (concat lgit-linepat (regexp-quote file) "\\.r[0-9]+$")))
-    ;; XXX/lomew we assume they aren't in the marked files, see lgit-mark-file.
-    ))
 
 (defun lgit-change-this-file-index-state (newstate)
   ;; Change the displayed index state of the file on this line.
@@ -1339,14 +1340,14 @@ the value of `foo'."
   ;; Change the displayed index state of a file.
   (save-excursion
     (goto-char (point-min))
-    (if (re-search-forward (concat lgit-linepat (regexp-quote file) "$") nil t)
+    (if (re-search-forward (lgit-filepat file) nil t)
 	(lgit-change-this-file-index-state newstate))))
 
 (defun lgit-change-file-working-state (file newstate)
   ;; Change the displayed working-tree state of a file.
   (save-excursion
     (goto-char (point-min))
-    (if (re-search-forward (concat lgit-linepat (regexp-quote file) "$") nil t)
+    (if (re-search-forward (lgit-filepat file) nil t)
 	(lgit-change-this-file-working-state newstate))))
 
 (defun lgit-info ()
