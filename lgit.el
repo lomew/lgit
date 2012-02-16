@@ -169,7 +169,7 @@ the \\[lgit-explain-this-line] command.")
 ;; in "git status" output.  Also takes into account the characters
 ;; we add for marked files.
 ;; The parens are assumed to enclose the state information.
-(defconst lgit-status-linepat "^\\([ MADRCU?][ MADRCU?]\\)[ *]")
+(defconst lgit-status-linepat "^\\([ IMADRCU?][ WMADRCU?]\\)[ *]")
 
 ;; Line pattern appropriate for this buffer.
 (defconst lgit-linepat nil)
