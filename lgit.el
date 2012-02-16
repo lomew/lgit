@@ -618,11 +618,12 @@ formally committed."
 	;; "??" -> "A "
 	;; Update the diplayed state of the files to "M " from " M"
 	(let ((cur files)
-	      file state)
+	      pair file state)
 	  (while cur
-	    (setq file (car (car cur))
-		  state (cdr (car cur)))
+	    (setq pair (car cur))
 	    (setq cur (cdr cur))
+	    (setq file (car pair)
+		  state (cdr pair))
 	    (if (memq 'untracked state)
 		(lgit-change-file-index-state file 'i-added)
 	      (lgit-change-file-index-state file 'i-modified))
@@ -714,10 +715,11 @@ Does the equivalent of \"git reset HEAD file1 file2...\"."
 	;; Update the diplayed state of the files.
 	;; "M." -> " M"
 	(let ((cur files)
-	      file)
+	      pair file)
 	  (while cur
-	    (setq file (cdr (car cur)))
+	    (setq pair (car cur))
 	    (setq cur (cdr cur))
+	    (setq file (car pair))
 	    (lgit-change-file-index-state file 'i-unmodified)
 	    (lgit-change-file-working-state file 'w-modified)))
       ;; Otherwise an error happened, bitch appropriately
@@ -753,11 +755,12 @@ Does the equivalent of \"git checkout -- file1 file2...\"."
 	  ;; Revert some buffers and update the displayed status.
 	  ;; "xM" -> "x "
 	  (let ((cur files)
-		file state)
+		pair file state)
 	    (while cur
-	      (setq file (car (car cur))
-		    state (cdr (car cur)))
+	      (setq pair (car cur))
 	      (setq cur (cdr cur))
+	      (setq file (car pair)
+		    state (cdr pair))
 	      (if (memq 'i-unmodified state)
 		  ;; No index changes, remove the line.
 		  (lgit-remove-file-line file)
