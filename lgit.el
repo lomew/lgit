@@ -203,9 +203,9 @@ the \\[lgit-explain-this-line] command.")
     (define-key map "C" 'lgit-commit)
     (define-key map "d" 'lgit-diff-base)
     (define-key map "D" 'lgit-diff-staged)
-;    (Define-key map "e" 'lcvs-ediff)
-;    (define-key map "l" 'lgit-log-base)
-;    (define-key map "L" 'lgit-log-head)
+;    (define-key map "e" 'lcvs-ediff)
+;    (define-key map "l" 'lgit-log-base) ***
+;    (define-key map "L" 'lgit-log-head) ***
 ;    (define-key map "s" 'lcvs-show-status)
 ;    (define-key map "S" 'lgit-sort)
 ;    (define-key map "a" 'lcvs-annotate)
@@ -217,6 +217,7 @@ the \\[lgit-explain-this-line] command.")
     (define-key map "q" 'lgit-quit-just-bury)
     (define-key map "+" 'lgit-add)
     (define-key map "-" 'lgit-unstage)
+    (define-key map "B" 'lgit-checkout-branch)
 ;    (define-key map "-" 'lcvs-remove-crap)
 ;    (define-key map "\C-k" 'lcvs-kill-region-or-line)
 ;    (define-key map "\C-w" 'lcvs-kill-region)
@@ -593,6 +594,7 @@ formally committed."
   (let ((files (lgit-get-relevant-files arg))
 	status cur)
     ;; Check thru the files for addable ones.  These are only ?/unversioned ones
+    ;; XXX/lomew when merge conflicts, get UU files
     (setq cur files)
     (while cur
       (setq state (cdr (car cur)))
@@ -827,6 +829,29 @@ disable the confirmation, you can set `lgit-resolve-confirm' to nil."
 		"\n")
 	(error "Resolve, see *GIT-resolved* buffer for details.")))))
 
+(defun lgit-checkout-branch (cmd)
+  (interactive
+   (list (if current-prefix-arg
+	     (read-from-minibuffer "Run git checkout (like this): " "checkout -q ")
+	   (concat "checkout -q "
+		   (completing-read "Switch to branch: " (lgit-get-branches))))))
+  (let (status)
+    (message "Running git %s..." cmd)
+    (setq status (lgit-do-shell-command-quietly cmd))
+    (message "Running git %s...done" cmd)
+    (if (zerop status)
+	(progn
+	  (lgit-refresh-buffer nil)
+	  (kill-buffer "*GIT-shell*"))
+      ;; Otherwise an error happened, bitch appropriately
+      (pop-to-buffer "*GIT-shell*")
+      (goto-char (point-min))
+      (insert "\n"
+	      "*** The checkout was not completely successful.\n"
+	      "*** Check this buffer closely to determine what is wrong.\n"
+	      "\n")
+      (error "Checkout, see *GIT-shell* buffer for details."))))
+      
 
 ;; The committing major mode
 
@@ -1222,6 +1247,26 @@ the value of `foo'."
 			args))
     status))
 
+(defun lgit-do-shell-command-quietly (cmd)
+  ;; Do the git command `cmd' and print the result in buffer *GIT-shell*.
+  ;; Returns the command exit status.
+  ;;
+  ;; Like lgit-do-command-quietly but takes the whole command as a
+  ;; string, like "status -q" rather than a list of ("status" "-q").
+  (let ((command (concat lgit-git-command " " cmd))
+	(bufname "*GIT-shell*")
+	(cwd default-directory)
+	status buf)
+    (setq buf (get-buffer-create bufname))
+    (save-excursion
+      (set-buffer buf)
+      (setq default-directory cwd)
+      (setq buffer-read-only nil)
+      (erase-buffer))
+    (setq status (apply 'call-process-shell-command command
+			nil buf nil))
+    status))
+
 (defun lgit-set-view-mode (win buf)
   ;; Turn view-mode on for BUF in window WIN, making sure quitting it
   ;; will get us back somewhere sane.
@@ -1479,6 +1524,23 @@ the value of `foo'."
 	      (t
 	       (error "cannot determine current branch")))
       (kill-buffer bufname))))
+
+(defun lgit-get-branches ()
+  ;; Return the list of branches
+  (let ((status (lgit-do-command-quietly "branch" '("-a")))
+	(bufname "*GIT-branch*")
+	branches)
+    (if (zerop status)
+	(save-excursion
+	  (set-buffer bufname)
+	  (goto-char (point-min))
+	  (while (re-search-forward "^[ *] \\(.+\\)" nil t)
+	    (let ((b (match-string 1)))
+	      (if (string-match "\\(.+\\) -> \\(.+\\)" b)
+		  (setq b (match-string 1 b)))
+	      (setq branches (cons b branches))))))
+    (kill-buffer bufname)
+    branches))
 
 
 ;; Process-related stuff.
