@@ -136,8 +136,8 @@ the \\[lgit-explain-this-line] command.")
 
 (defvar lgit-common-font-lock-keywords
   '(
-    ("^[MDAR].*"	. lgit-modified-face)
-    ("^.[M].*"		. lgit-modified-face)
+    ("^[MDART].*"	. lgit-modified-face)
+    ("^.[MT].*"		. lgit-modified-face)
     ("^C.*"		. lgit-conflicted-face)
     ("^.C.*"		. lgit-conflicted-face)
     ))
@@ -169,7 +169,7 @@ the \\[lgit-explain-this-line] command.")
 ;; in "git status" output.  Also takes into account the characters
 ;; we add for marked files.
 ;; The parens are assumed to enclose the state information.
-(defconst lgit-status-linepat "^\\([ IMADRCU?][ WMADRCU?]\\)[ *]")
+(defconst lgit-status-linepat "^\\([ IMADRCUT?][ WMADRCUT?]\\)[ *]")
 
 ;; Line pattern appropriate for this buffer.
 (defconst lgit-linepat nil)
@@ -704,7 +704,8 @@ Does the equivalent of \"git reset HEAD file1 file2...\"."
       (setq cur (cdr cur))
       (cond
        ;; XXX/lomew test other states, added, deleted, renamed, etc
-       ((or (memq 'i-modified state))
+       ((or (memq 'i-modified state)
+	    (memq 'i-typechange state))
 	nil)
        (t
 	(error "Can only unstage modified files"))))
@@ -722,9 +723,13 @@ Does the equivalent of \"git reset HEAD file1 file2...\"."
 	  (while cur
 	    (setq pair (car cur))
 	    (setq cur (cdr cur))
-	    (setq file (car pair))
+	    (setq file (car pair)
+		  state (cdr pair))
 	    (lgit-change-file-index-state file 'i-unmodified)
-	    (lgit-change-file-working-state file 'w-modified)))
+	    (cond ((memq 'i-typechange state)
+		   (lgit-change-file-working-state file 'w-typechange))
+		  ((memq 'i-modified state)
+		   (lgit-change-file-working-state file 'w-modified)))))
       ;; Otherwise an error happened, bitch appropriately
       (pop-to-buffer "*GIT-reset*")
       (goto-char (point-min))
@@ -745,7 +750,7 @@ Does the equivalent of \"git checkout -- file1 file2...\"."
   (let* ((files (lgit-get-relevant-files arg))
 	 (multiple-p (cdr files))
 	 status)
-    (if (and lgit-revert-confirm
+    (if (and lgit-discard-confirm
 	     (not (yes-or-no-p (format "Discard unstaged changes to %s? "
 				       (if multiple-p
 					   "the marked files"
@@ -1104,7 +1109,8 @@ This mode is not meant to be user invoked."
     (if (string-match "^D" str) (setq state (cons 'i-deleted state)))
     (if (string-match "^R" str) (setq state (cons 'i-renamed state)))
     (if (string-match "^C" str) (setq state (cons 'i-copied state)))
-    (if (string-match "^U" str) (setq state (cons 'i-updated state)))
+    (if (string-match "^U" str) (setq state (cons 'i-unmerged state)))
+    (if (string-match "^T" str) (setq state (cons 'i-typechange state)))
     (if (string-match "^\\?" str) (setq state (cons 'untracked state)))
     ;; 2nd column - work tree
     (if (string-match "^. " str) (setq state (cons 'w-unmodified state)))
@@ -1113,7 +1119,8 @@ This mode is not meant to be user invoked."
     (if (string-match "^.D" str) (setq state (cons 'w-deleted state)))
 		      ; .R - shouldn't happen
 		      ; .C - shouldn't happen
-    (if (string-match "^.U" str) (setq state (cons 'w-updated state)))
+    (if (string-match "^.U" str) (setq state (cons 'w-unmerged state)))
+    (if (string-match "^.T" str) (setq state (cons 'w-typechange state)))
     (if (string-match "^.\\?" str) (setq state (cons 'untracked state)))
     state))
 
@@ -1341,7 +1348,8 @@ the value of `foo'."
 			    ((eq newstate 'i-deleted)    ?D)
 			    ((eq newstate 'i-renamed)    ?R)
 			    ((eq newstate 'i-copied)     ?C)
-			    ((eq newstate 'i-updated)    ?U)
+			    ((eq newstate 'i-unmerged)   ?U)
+			    ((eq newstate 'i-typechange) ?T)
 			    ((eq newstate 'i-untracked)  ??)
 			    (t (error "Illegal new file state")))))
     ;; Rewrite the first column of the line.
@@ -1366,7 +1374,8 @@ the value of `foo'."
 			    ((eq newstate 'w-modified)	 ?M)
 			    ((eq newstate 'w-added)	 ?A)
 			    ((eq newstate 'w-deleted)    ?D)
-			    ((eq newstate 'w-updated)    ?U)
+			    ((eq newstate 'w-unmerged)   ?U)
+			    ((eq newstate 'w-typechange) ?T)
 			    ((eq newstate 'w-untracked)  ??)
 			    (t (error "Illegal new file state")))))
     ;; Rewrite the first column of the line.
