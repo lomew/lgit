@@ -1,3 +1,23 @@
-Some emacs modes to work with GIT, SVN, and CVS.
+Emacs mode to work with GIT.  Intended to assist with day-to-day commits
+by making it easy to see the working tree status and add changes for commit.
 
-Under construction.
+Under construction, adapting from my older lsvn.el.
+
+Commands:
+
+M-x lgit-status
+	This is the main entry point.  Runs git status --porcelain
+
+n/p		next-line/previous-line
+m/u		mark/unmark
++/-		stage/unstage
+R		discard (aka revert) local changes (requires confirm)
+d		diff working tree (show diffs of unstaged changes)
+D		diff index (show diffs of what is staged)
+C		commit index, prompts for log
+g		refresh the status buffer
+G		run lgit-status, useful for going to another repository
+f,RET		find-file under cursor
+o		find-file under cursor, other window
+B		switch branches
+C-c C-k		kill running status process
