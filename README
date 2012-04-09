@@ -19,5 +19,5 @@ g		refresh the status buffer
 G		run lgit-status, useful for going to another repository
 f,RET		find-file under cursor
 o		find-file under cursor, other window
-B		switch branches
+B		switch or create branches
 C-c C-k		kill running status process
