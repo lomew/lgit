@@ -618,6 +618,7 @@ formally committed."
 	;; " M" -> "M "
 	;; "??" -> "A "
 	;; Update the diplayed state of the files to "M " from " M"
+	;; XXX/lomew would be better to just run git status --porcelain on the individual files
 	(let ((cur files)
 	      pair file state)
 	  (while cur
@@ -1218,16 +1219,27 @@ the value of `foo'."
 	     (save-excursion
 	       (set-buffer buf)
 	       (setq default-directory cwd)
+               ;; Handle no output
 	       (if (zerop (lgit-buffer-size buf))
 		   (insert default-output))
+               ;; Maybe turn on diff-mode.  We make it read only
+               ;; so n/p, etc, can be used rather than M-n/M-p,
+               ;; but we also want undo available in case we
+               ;; start changing stuff around.
 	       (if (and lgit-use-diff-mode
 			(string-equal cmd "diff")
 			(fboundp 'diff-mode))
 		   (progn
 		     (diff-mode)
 		     (buffer-enable-undo)
-		     (setq buffer-read-only t))))
+		     (setq buffer-read-only t)
+                     ;; Make revert-buffer work (bound to g in diff-mode)
+                     (set (make-local-variable 'revert-buffer-function)
+                          (lexical-let ((c cmd) (d default-output) (o opts))
+                            (lambda (ignore-auto noconfirm)
+                              (lgit-do-command c d o)))))))
 	     (let ((win (display-buffer buf)))
+               ;; Maybe turn on view-mode
 	       (if (member cmd lgit-view-mode-commands)
 		   (lgit-set-view-mode win buf))))))
       (with-output-to-temp-buffer bufname

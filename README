@@ -21,3 +21,15 @@ f,RET		find-file under cursor
 o		find-file under cursor, other window
 B		switch or create branches
 C-c C-k		kill running status process
+
+Diff buffers use Emacs' diff-mode, which has various keybindings that
+are worth pointing out:
+
+n/p		next-hunk/previous-hunk
+o,RET		goto-source
+g		revert-buffer (refreshes the diff, useful when
+		 cleaning up your patch)
+C-c C-a		diff-apply-hunk (applies or backs out a hunk)
+C-c C-s		diff-split-hunk (useful for reducing a hunk in
+		  preparation for backing out with with C-c C-a,
+		  like some temp testing code)
