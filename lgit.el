@@ -594,7 +594,6 @@ formally committed."
   (let ((files (lgit-get-relevant-files arg))
 	status cur)
     ;; Check thru the files for addable ones.  These are only ?/unversioned ones
-    ;; XXX/lomew when merge conflicts, get UU files
     (setq cur files)
     (while cur
       (setq state (cdr (car cur)))
@@ -602,7 +601,9 @@ formally committed."
       (cond
        ((or (memq 'i-modified state)
 	    (memq 'w-modified state)
-	    (memq 'untracked state))
+	    (memq 'untracked state)
+	    (and (memq 'w-unmerged state)
+		 (memq 'i-unmerged state)))
 	nil)
 ;       ((memq 'deleted state)
 ;	;; XXX/lomew it would be nice to collect these and then do a git revert
@@ -630,6 +631,9 @@ formally committed."
 	     ((memq 'untracked state)		; ?? -> A_
 	      (lgit-change-file-index-state file 'i-added))
 	     ((memq 'i-unmodified state)	; _x -> Mx
+	      (lgit-change-file-index-state file 'i-modified))
+	     ((and (memq 'w-unmerged state)     ; UU -> M_
+		   (memq 'i-unmerged state))
 	      (lgit-change-file-index-state file 'i-modified)))
 	    (lgit-change-file-working-state file 'w-unmodified))) ; xx -> x_
       ;; Otherwise an error happened, bitch appropriately
