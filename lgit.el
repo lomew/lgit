@@ -704,9 +704,10 @@ Does the equivalent of \"git reset HEAD file1 file2...\"."
       (setq state (cdr (car cur)))
       (setq cur (cdr cur))
       (cond
-       ;; XXX/lomew test other states, added, deleted, renamed, etc
+       ;; XXX/lomew test other states, added, renamed, etc
        ((or (memq 'i-modified state)
-	    (memq 'i-typechange state))
+	    (memq 'i-typechange state)
+	    (memq 'i-deleted state))
 	nil)
        (t
 	(error "Can only unstage modified files"))))
@@ -730,7 +731,9 @@ Does the equivalent of \"git reset HEAD file1 file2...\"."
 	    (cond ((memq 'i-typechange state)
 		   (lgit-change-file-working-state file 'w-typechange))
 		  ((memq 'i-modified state)
-		   (lgit-change-file-working-state file 'w-modified)))))
+		   (lgit-change-file-working-state file 'w-modified))
+		  ((memq 'i-deleted state)
+		   (lgit-change-file-working-state file 'w-deleted)))))
       ;; Otherwise an error happened, bitch appropriately
       (pop-to-buffer "*GIT-reset*")
       (goto-char (point-min))
