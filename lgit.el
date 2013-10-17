@@ -847,7 +847,7 @@ disable the confirmation, you can set `lgit-resolve-confirm' to nil."
    (list (if current-prefix-arg
 	     (read-from-minibuffer "Run git checkout (like this): " "checkout -q ")
 	   (concat "checkout -q "
-		   (completing-read "Switch to branch: " (lgit-get-branches))))))
+		   (completing-read "Switch to branch: " (lgit-get-local-branches))))))
   (let (status)
     (message "Running git %s..." cmd)
     (setq status (lgit-do-shell-command-quietly cmd))
@@ -1553,9 +1553,9 @@ the value of `foo'."
 	       (error "cannot determine current branch")))
       (kill-buffer bufname))))
 
-(defun lgit-get-branches ()
-  ;; Return the list of branches
-  (let ((status (lgit-do-command-quietly "branch" '("-a")))
+(defun lgit-get-local-branches ()
+  ;; Return the list of local branches
+  (let ((status (lgit-do-command-quietly "branch"))
 	(bufname "*GIT-branch*")
 	branches)
     (if (zerop status)
