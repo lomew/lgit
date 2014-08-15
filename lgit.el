@@ -927,7 +927,23 @@ This mode is not meant to be user invoked."
     ;; XXX/lomew note this assumes commit.status=true
     (setq status (lgit-do-command-quietly "commit" (list "--dry-run")))
     (if (zerop status)
-	(insert-buffer-substring bufname)
+	(progn
+	  (save-excursion
+	    ;; Go add # to each line if it isn't there already.  This
+	    ;; used to be the default but changed in Git 1.8.5 when
+	    ;; "status" and "commit --dry-run" stopped prefixing lines
+	    ;; with #.
+	    ;;
+	    ;; This is a goofy implementation since $ can't be used
+	    ;; within a grouping construct in emacs regexps, otherwise
+	    ;; I'd search for "^\\([^#]\\|$\\)
+	    (set-buffer bufname)
+	    (goto-char (point-min))
+	    (while (re-search-forward "^" nil t)
+	      (if (looking-at "#")
+		  (forward-char 1)
+		(insert "# "))))
+	  (insert-buffer-substring bufname))
       (pop-to-buffer bufname)
       (error "git \"commit --dry-run\" failed, see %s buffer for details"
 	     bufname))))
