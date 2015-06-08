@@ -1257,11 +1257,18 @@ the value of `foo'."
 		     (diff-mode)
 		     (buffer-enable-undo)
 		     (setq buffer-read-only t)
-                     ;; Make revert-buffer work (bound to g in diff-mode)
+                     ;; Make revert-buffer work (bound to g in
+		     ;; diff-mode).  Since elisp lacks closures I do
+		     ;; something hacky with a local variable.  I used
+		     ;; to use `lexical-let' but it is obsolete in
+		     ;; emacs 24, which has lexical binding and true
+		     ;; closures.  But it is confusing how to support
+		     ;; emacs 23 and 24.
+		     (set (make-local-variable 'lgit-revert-cmd-args)
+			  (list cmd default-output opts))
                      (set (make-local-variable 'revert-buffer-function)
-                          (lexical-let ((c cmd) (d default-output) (o opts))
-                            (lambda (ignore-auto noconfirm)
-                              (lgit-do-command c d o)))))))
+			  (lambda (ignore-auto noconfirm)
+			    (apply 'lgit-do-command lgit-revert-cmd-args))))))
 	     (let ((win (display-buffer buf)))
                ;; Maybe turn on view-mode
 	       (if (member cmd lgit-view-mode-commands)
