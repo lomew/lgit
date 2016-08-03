@@ -1269,7 +1269,7 @@ the value of `foo'."
                      (set (make-local-variable 'revert-buffer-function)
 			  (lambda (ignore-auto noconfirm)
 			    (apply 'lgit-do-command lgit-revert-cmd-args))))))
-	     (let ((win (display-buffer buf)))
+	     (let ((win (display-buffer buf t)))
                ;; Maybe turn on view-mode
 	       (if (member cmd lgit-view-mode-commands)
 		   (lgit-set-view-mode win buf))))))
