@@ -25,6 +25,15 @@
 
 ;;; Commentary:
 
+;; How to install:
+;;   1. Put this file somewhere, like ~/emacs/lgit/lgit.el
+;;   2. Add to the load-path:
+;;       (add-to-list 'load-path (expand-file-name "~/emacs/lgit"))
+;;   3. Set up to autoload:
+;;       (autoload 'lgit-status "lgit" nil t)
+;;   3. Set up a keybinding to invoke, I use C-c X, you can use what you like:
+;;       (global-set-key "\C-cX" 'lgit-status)
+
 ;; todo
 ;; - see git.el in contrib/emacs, similar to pcl-cvs
 ;; - can use git apply --cached --recount to apply individual hunks
