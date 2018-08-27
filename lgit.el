@@ -935,7 +935,8 @@ This mode is not meant to be user invoked."
   (let ((bufname "*GIT-commit*")
 	status)
     ;; XXX/lomew note this assumes commit.status=true
-    (setq status (lgit-do-command-quietly "commit" (list "--dry-run")))
+    ;; -uno to not list untracked files, which takes a while in the monorepo
+    (setq status (lgit-do-command-quietly "commit" (list "--dry-run" "-uno")))
     (if (zerop status)
 	(progn
 	  (save-excursion
