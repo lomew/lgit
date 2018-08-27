@@ -1077,7 +1077,8 @@ This mode is not meant to be user invoked."
 	    (mod (+ lgit-commit-msgs-index arg) len))
       (message "Commit Msg %d" (1+ lgit-commit-msgs-index))
       (insert (ring-ref lgit-commit-msgs lgit-commit-msgs-index))
-      (insert lgit-commit-initial-buffer-contents))))
+      (insert lgit-commit-initial-buffer-contents)
+      (goto-char (point-min)))))
 
 (defun lgit-commit-insert-next-commit-msg (arg)
   "Cycle forwards thru commit message history."
